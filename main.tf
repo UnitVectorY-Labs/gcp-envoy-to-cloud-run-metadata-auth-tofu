@@ -89,20 +89,20 @@ resource "google_cloud_run_service_iam_member" "envoy_anonymous_access" {
 # Create the Configuration for the Envoy Proxy from the Template
 
 locals {
-  template = templatefile("${path.module}/envoy-template.yaml", {
+  envoy_config = templatefile("${path.module}/envoy-template.yaml", {
     # EnvoyProxy needs to know the URL of the backend service from Cloud Run
     BACKEND_DOMAIN = trimprefix(google_cloud_run_v2_service.backend.uri, "https://")
   })
 
   # We use a hash of the template to trigger a redeployment when the template changes
-  template_hash = sha256(local.template)
+  envoy_config_hash = sha256(local.envoy_config)
 }
 
 resource "google_storage_bucket_object" "envoy_config" {
   # Store the configuration in a bucket to be read by the Envoy Proxy
   name    = "envoy.yaml"
   bucket  = google_storage_bucket.config.name
-  content = local.template
+  content = local.envoy_config
 }
 
 # Deploy the Cloud Run Services (EnvoyProxy and Backend)
@@ -148,7 +148,7 @@ resource "google_cloud_run_v2_service" "envoy" {
       # Trigger a redeployment when the configuration changes
       env {
         name  = "CONFIG_HASH"
-        value = local.template_hash
+        value = local.envoy_config_hash
       }
     }
 
